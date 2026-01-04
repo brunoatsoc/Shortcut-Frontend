@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Ubuntu';
+  src: url('/fonts/Ubuntu-L.woff') format('truetype'); /* Vamos colocar o arquivo aqui depois */
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  @apply bg-gray-100 text-gray-900 transition-colors duration-300;
+}
+
+/* Estilos para o modo escuro no body */
+.dark body {
+  @apply bg-gray-900 text-gray-100;
+}
