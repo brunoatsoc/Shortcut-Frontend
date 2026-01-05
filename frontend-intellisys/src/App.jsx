@@ -16,7 +16,7 @@ function App() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
   const [loginData, setLoginData] = useState({ username: '', password: '' });
-  const [shortcutData, setShortcutData] = useState({ id: null, name: '', url: '' });
+  const [shortcutData, setShortcutData] = useState({ id: null, name: '', url: '', image_url: '' });
 
   // --- EFEITOS ---
   useEffect(() => {
@@ -77,7 +77,7 @@ function App() {
       }
       fetchShortcuts();
       setIsEditModalOpen(false);
-      setShortcutData({ id: null, name: '', url: '' });
+      setShortcutData({ id: null, name: '', url: '', image_url: '' });
     } catch (error) {
       alert("Erro ao salvar. Verifique se está logado.");
     }
@@ -96,17 +96,16 @@ function App() {
   };
 
   const openEdit = (item) => {
-    setShortcutData(item);
+    setShortcutData({ ...item, image_url: item.image_url || '' });
     setIsEditModalOpen(true);
   };
 
   const openNew = () => {
-    setShortcutData({ id: null, name: '', url: '' });
+    setShortcutData({ id: null, name: '', url: '', image_url: '' });
     setIsEditModalOpen(true);
   };
 
   // --- URL DO SITE DA EMPRESA ---
-  // Edite aqui o link real da sua empresa
   const COMPANY_SITE_URL = "http://www.intellisys.com.br/BRPT/index.awp"; 
 
   // --- RENDERIZAÇÃO ---
@@ -116,15 +115,13 @@ function App() {
       {/* --- HEADER --- */}
       <header className="flex flex-col md:flex-row justify-between items-center p-6 bg-white dark:bg-gray-800 shadow-md gap-4">
         
-        {/* LOGO */}
+        {/* LOGO HEADER */}
         <div className="text-4xl select-none" style={{ fontFamily: 'Ubuntu, sans-serif' }}>
           <span className="text-black dark:text-white">Intelli</span>
           <span className="text-red-600">sys</span>
         </div>
 
         <div className="flex items-center gap-6">
-          
-          {/* --- NOVO: Link para o Site da Empresa --- */}
           <a 
             href={COMPANY_SITE_URL}
             target="_blank"
@@ -136,14 +133,12 @@ function App() {
             <span className="hidden sm:inline">Site IntelliSys</span>
           </a>
 
-          <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div> {/* Separador Visual */}
+          <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
 
-          {/* Botão de Tema */}
           <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
             {theme === 'light' ? <Moon className="text-gray-700" /> : <Sun className="text-yellow-400" />}
           </button>
 
-          {/* Botão de Configurações / Login */}
           {token ? (
              <div className="flex items-center gap-2">
                <button onClick={handleLogout} className="text-sm text-red-500 font-semibold hover:underline">Sair</button>
@@ -169,8 +164,27 @@ function App() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {shortcuts.map((shortcut) => (
-            <div key={shortcut.id} className="relative bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-1 border-l-4 border-red-600 group">
+            <div key={shortcut.id} className="relative bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-1 border-l-4 border-red-600 group flex flex-col h-full">
               
+              {/* --- ÁREA DA LOGO (Sem bordas, limpa) --- */}
+              <div className="h-24 w-full mb-4 flex items-center justify-center">
+                {shortcut.image_url ? (
+                  // LOGO: Fundo transparente, sem bordas
+                  <img 
+                    src={shortcut.image_url} 
+                    alt={`Logo ${shortcut.name}`} 
+                    className="h-full w-full object-contain" 
+                  />
+                ) : (
+                  // LETRA: Dentro de um círculo suave para não ficar "solta"
+                  <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                    <span className="text-3xl font-bold text-gray-500 dark:text-gray-300 select-none">
+                      {shortcut.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
+
               <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{shortcut.name}</h3>
               <a 
                 href={shortcut.url} 
@@ -180,6 +194,8 @@ function App() {
               >
                 <ExternalLink size={14}/> Acessar Sistema
               </a>
+
+              <div className="mt-auto"></div>
 
               {token && (
                 <div className="flex justify-end gap-2 mt-4 border-t pt-2 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -196,10 +212,7 @@ function App() {
         </div>
       </main>
 
-      {/* --- MODAIS (Login e Edição) --- */}
-      {/* O código dos modais continua igual, mantive oculto aqui para não ficar gigante, 
-          mas se copiou o código TODO acima, eles já estão lá embaixo da main */}
-      
+      {/* --- MODAL LOGIN --- */}
       {isLoginOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-2xl w-96 relative">
@@ -228,6 +241,7 @@ function App() {
         </div>
       )}
 
+      {/* --- MODAL EDITAR/NOVO --- */}
       {isEditModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-2xl w-96 relative">
@@ -248,8 +262,20 @@ function App() {
                   required
                 />
               </div>
+              
               <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400">URL do Site</label>
+                <label className="block text-sm text-gray-600 dark:text-gray-400">URL da Logo (Imagem)</label>
+                <input 
+                  type="text" 
+                  placeholder="http://site.com/logo.png"
+                  className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                  value={shortcutData.image_url}
+                  onChange={e => setShortcutData({...shortcutData, image_url: e.target.value})}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400">URL do Sistema</label>
                 <input 
                   type="text" 
                   className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"

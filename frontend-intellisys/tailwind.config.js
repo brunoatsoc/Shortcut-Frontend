@@ -4,9 +4,13 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'class', // Importante para o botão de trocar tema funcionar manualmente
+  darkMode: 'class', // Importante para controlarmos o tema manualmente
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        ubuntu: ['Ubuntu', 'sans-serif'], // Adiciona a fonte Ubuntu
+      }
+    },
   },
   plugins: [],
 }
