@@ -4,7 +4,7 @@ import { Settings, Moon, Sun, Plus, Trash, Edit, X, ExternalLink, Globe } from '
 
 // --- CONFIGURAÇÃO DA API ---
 const api = axios.create({
-  baseURL: 'http://localhost:8080', 
+  baseURL: '/api', 
 });
 
 function App() {
