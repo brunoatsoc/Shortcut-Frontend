@@ -154,7 +154,7 @@ function App() {
       {/* --- CONTEÚDO PRINCIPAL --- */}
       <main className="p-8 max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Atalhos dos Clientes</h2>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Nossos Clientes</h2>
           {token && (
             <button onClick={openNew} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow transition">
               <Plus size={18} /> Novo Atalho
