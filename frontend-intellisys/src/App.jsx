@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Settings, Moon, Sun, Plus, Trash, Edit, X, ExternalLink, Globe } from 'lucide-react';
+import { Settings, Moon, Sun, Plus, Trash, Edit, X, ExternalLink, Globe, Upload } from 'lucide-react';
 
 // --- CONFIGURAÇÃO DA API ---
+const API_BASE_URL = 'http://localhost:8080'; 
+
 const api = axios.create({
-  baseURL: '/api', 
+  baseURL: API_BASE_URL, 
 });
 
 function App() {
@@ -14,9 +16,13 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  
+   
   const [loginData, setLoginData] = useState({ username: '', password: '' });
+  
+  // Dados do atalho (texto)
   const [shortcutData, setShortcutData] = useState({ id: null, name: '', url: '', image_url: '' });
+  
+  const [selectedFile, setSelectedFile] = useState(null);
 
   // --- EFEITOS ---
   useEffect(() => {
@@ -66,19 +72,38 @@ function App() {
 
   const handleSaveShortcut = async (e) => {
     e.preventDefault();
-    const config = { headers: { Authorization: `Bearer ${token}` } };
+    
+    // Configuração do Header para aceitar arquivo
+    const config = { 
+        headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data' // Para o Upload
+        } 
+    };
+
+    // Cria o objeto FormData
+    const formData = new FormData();
+    formData.append('name', shortcutData.name);
+    formData.append('url', shortcutData.url);
+    
+    // Se o usuário selecionou um arquivo novo, anexa ele
+    if (selectedFile) {
+        formData.append('image', selectedFile);
+    }
 
     try {
       if (shortcutData.id) {
-        await api.put(`/shortcut/${shortcutData.id}`, shortcutData, config);
+        // Editando
+        await api.put(`/shortcut/${shortcutData.id}`, formData, config);
       } else {
-        const { id, ...newShortcut } = shortcutData; 
-        await api.post('/shortcut', newShortcut, config);
+        // Criando novo
+        await api.post('/shortcut', formData, config);
       }
+      
       fetchShortcuts();
-      setIsEditModalOpen(false);
-      setShortcutData({ id: null, name: '', url: '', image_url: '' });
+      closeModal(); // Função auxiliar para limpar e fechar
     } catch (error) {
+      console.error(error);
       alert("Erro ao salvar. Verifique se está logado.");
     }
   };
@@ -97,12 +122,28 @@ function App() {
 
   const openEdit = (item) => {
     setShortcutData({ ...item, image_url: item.image_url || '' });
+    setSelectedFile(null); 
     setIsEditModalOpen(true);
   };
 
   const openNew = () => {
     setShortcutData({ id: null, name: '', url: '', image_url: '' });
+    setSelectedFile(null);
     setIsEditModalOpen(true);
+  };
+
+  const closeModal = () => {
+      setIsEditModalOpen(false);
+      setShortcutData({ id: null, name: '', url: '', image_url: '' });
+      setSelectedFile(null);
+  }
+
+  // Se for link externo (http...), usa direto. 
+  // Se for caminho relativo (/uploads...), adiciona a URL da API antes.
+  const getImageUrl = (path) => {
+      if (!path) return null;
+      if (path.startsWith('http')) return path;
+      return `${API_BASE_URL}${path}`;
   };
 
   // --- URL DO SITE DA EMPRESA ---
@@ -166,17 +207,16 @@ function App() {
           {shortcuts.map((shortcut) => (
             <div key={shortcut.id} className="relative bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-1 border-l-4 border-red-600 group flex flex-col h-full">
               
-              {/* --- ÁREA DA LOGO (Sem bordas, limpa) --- */}
+              {/* --- ÁREA DA LOGO --- */}
               <div className="h-24 w-full mb-4 flex items-center justify-center">
                 {shortcut.image_url ? (
-                  // LOGO: Fundo transparente, sem bordas
+                  // --- MUDANÇA: Usa a função getImageUrl para resolver o caminho ---
                   <img 
-                    src={shortcut.image_url} 
+                    src={getImageUrl(shortcut.image_url)} 
                     alt={`Logo ${shortcut.name}`} 
                     className="h-full w-full object-contain" 
                   />
                 ) : (
-                  // LETRA: Dentro de um círculo suave para não ficar "solta"
                   <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
                     <span className="text-3xl font-bold text-gray-500 dark:text-gray-300 select-none">
                       {shortcut.name.charAt(0).toUpperCase()}
@@ -245,7 +285,7 @@ function App() {
       {isEditModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-2xl w-96 relative">
-            <button onClick={() => setIsEditModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-red-500">
+            <button onClick={closeModal} className="absolute top-4 right-4 text-gray-500 hover:text-red-500">
               <X />
             </button>
             <h2 className="text-2xl font-bold mb-6 dark:text-white text-center">
@@ -263,15 +303,29 @@ function App() {
                 />
               </div>
               
+              {/* --- MUDANÇA: Input de Upload de Imagem --- */}
               <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400">URL da Logo (Imagem)</label>
-                <input 
-                  type="text" 
-                  placeholder="http://site.com/logo.png"
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  value={shortcutData.image_url}
-                  onChange={e => setShortcutData({...shortcutData, image_url: e.target.value})}
-                />
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Logo (Imagem)</label>
+                
+                {/* Visualização do nome do arquivo atual ou selecionado */}
+                <div className="flex items-center gap-2 mb-2">
+                    <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded text-sm transition">
+                        <Upload size={16} /> Escolher Arquivo
+                        <input 
+                            type="file" 
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                    setSelectedFile(e.target.files[0]);
+                                }
+                            }}
+                        />
+                    </label>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[150px]">
+                        {selectedFile ? selectedFile.name : (shortcutData.image_url ? 'Imagem atual mantida' : 'Nenhum arquivo')}
+                    </span>
+                </div>
               </div>
 
               <div>
