@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Settings, Moon, Sun, Plus, Trash, Edit, X, ExternalLink, Globe, Upload } from 'lucide-react';
 
-// --- CONFIGURAÇÃO DA API ---
+// CONFIGURAÇÃO DA API (trocar para a URL correta para rodar em produção)
 const API_BASE_URL = 'http://localhost:8080'; 
 
 const api = axios.create({
@@ -10,7 +10,7 @@ const api = axios.create({
 });
 
 function App() {
-  // --- ESTADOS ---
+  // ESTADOS
   const [theme, setTheme] = useState('light');
   const [shortcuts, setShortcuts] = useState([]);
   const [token, setToken] = useState(localStorage.getItem('token') || null);
@@ -24,7 +24,7 @@ function App() {
   
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // --- EFEITOS ---
+  // EFEITOS (Tema escuro/claro)
   useEffect(() => {
     fetchShortcuts();
   }, []);
@@ -37,7 +37,7 @@ function App() {
     }
   }, [theme]);
 
-  // --- FUNÇÕES ---
+  // FUNÇÕES
   const fetchShortcuts = async () => {
     try {
       const response = await api.get('/shortcut');
@@ -73,35 +73,34 @@ function App() {
   const handleSaveShortcut = async (e) => {
     e.preventDefault();
     
-    // Configuração do Header para aceitar arquivo
     const config = { 
         headers: { 
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data' // Para o Upload
+            'Content-Type': 'multipart/form-data'
         } 
     };
 
-    // Cria o objeto FormData
     const formData = new FormData();
     formData.append('name', shortcutData.name);
     formData.append('url', shortcutData.url);
     
-    // Se o usuário selecionou um arquivo novo, anexa ele
     if (selectedFile) {
         formData.append('image', selectedFile);
+    } else {
+        if (shortcutData.image_url) {
+            formData.append('image_url', shortcutData.image_url);
+        }
     }
 
     try {
       if (shortcutData.id) {
-        // Editando
         await api.put(`/shortcut/${shortcutData.id}`, formData, config);
       } else {
-        // Criando novo
         await api.post('/shortcut', formData, config);
       }
       
       fetchShortcuts();
-      closeModal(); // Função auxiliar para limpar e fechar
+      closeModal();
     } catch (error) {
       console.error(error);
       alert("Erro ao salvar. Verifique se está logado.");
@@ -146,14 +145,14 @@ function App() {
       return `${API_BASE_URL}${path}`;
   };
 
-  // --- URL DO SITE DA EMPRESA ---
+  // URL DO SITE DA EMPRESA
   const COMPANY_SITE_URL = "http://www.intellisys.com.br/BRPT/index.awp"; 
 
-  // --- RENDERIZAÇÃO ---
+  // RENDERIZAÇÃO
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300 font-sans">
       
-      {/* --- HEADER --- */}
+      {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-center p-6 bg-white dark:bg-gray-800 shadow-md gap-4">
         
         {/* LOGO HEADER */}
@@ -192,7 +191,7 @@ function App() {
         </div>
       </header>
 
-      {/* --- CONTEÚDO PRINCIPAL --- */}
+      {/* CONTEÚDO PRINCIPAL */}
       <main className="p-8 max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Nossos Clientes</h2>
@@ -205,12 +204,15 @@ function App() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {shortcuts.map((shortcut) => (
-            <div key={shortcut.id} className="relative bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-1 border-l-4 border-red-600 group flex flex-col h-full">
+            <div 
+              key={shortcut.id} 
+              onClick={() => window.open(shortcut.url, '_blank')}
+              className="cursor-pointer relative bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-1 border-l-4 border-red-600 group flex flex-col h-full"
+            >
               
-              {/* --- ÁREA DA LOGO --- */}
+              {/* ÁREA DA LOGO */}
               <div className="h-24 w-full mb-4 flex items-center justify-center">
                 {shortcut.image_url ? (
-                  // --- MUDANÇA: Usa a função getImageUrl para resolver o caminho ---
                   <img 
                     src={getImageUrl(shortcut.image_url)} 
                     alt={`Logo ${shortcut.name}`} 
@@ -226,23 +228,27 @@ function App() {
               </div>
 
               <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{shortcut.name}</h3>
-              <a 
-                href={shortcut.url} 
-                target="_blank" 
-                rel="noreferrer" 
-                className="text-blue-500 hover:text-blue-400 text-sm flex items-center gap-1 mb-4 truncate"
-              >
+              
+              {/* Tranforma o Link em um span visual, já que o card todo é o link agora */}
+              <span className="text-blue-500 hover:text-blue-400 text-sm flex items-center gap-1 mb-4 truncate">
                 <ExternalLink size={14}/> Acessar Sistema
-              </a>
+              </span>
 
               <div className="mt-auto"></div>
 
               {token && (
                 <div className="flex justify-end gap-2 mt-4 border-t pt-2 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEdit(shortcut)} className="p-1 text-gray-500 hover:text-blue-500">
+                  {/* 3. Adicionado e.stopPropagation() para não abrir o site ao clicar nos botões */}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); openEdit(shortcut); }} 
+                    className="p-1 text-gray-500 hover:text-blue-500"
+                  >
                     <Edit size={18} />
                   </button>
-                  <button onClick={() => handleDelete(shortcut.id)} className="p-1 text-gray-500 hover:text-red-500">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleDelete(shortcut.id); }} 
+                    className="p-1 text-gray-500 hover:text-red-500"
+                  >
                     <Trash size={18} />
                   </button>
                 </div>
@@ -252,7 +258,7 @@ function App() {
         </div>
       </main>
 
-      {/* --- MODAL LOGIN --- */}
+      {/* MODAL LOGIN */}
       {isLoginOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-2xl w-96 relative">
@@ -281,7 +287,7 @@ function App() {
         </div>
       )}
 
-      {/* --- MODAL EDITAR/NOVO --- */}
+      {/* MODAL EDITAR/NOVO */}
       {isEditModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-2xl w-96 relative">
@@ -303,7 +309,7 @@ function App() {
                 />
               </div>
               
-              {/* --- MUDANÇA: Input de Upload de Imagem --- */}
+              {/* MUDANÇA: Input de Upload de Imagem */}
               <div>
                 <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Logo (Imagem)</label>
                 
