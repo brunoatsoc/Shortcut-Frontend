@@ -1,30 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import axios from 'axios';
 import { Settings, Moon, Sun, Plus, Trash, Edit, X, ExternalLink, Globe, Upload } from 'lucide-react';
 
-// CONFIGURAÇÃO DA API (trocar para a URL correta para rodar em produção)
-const API_BASE_URL = 'http://localhost:8080'; 
+// CONFIGURAÇÃO DA API - Adicionado o prefixo /api/v1 conforme seu Router Go
+const API_BASE_URL = 'http://localhost:8080/api/v1';
+const STATIC_BASE_URL = 'http://localhost:8080'; // Para carregar as imagens de /uploads
 
 const api = axios.create({
-  baseURL: API_BASE_URL, 
+  baseURL: API_BASE_URL,
+  withCredentials: true, // ESSENCIAL: Permite que o navegador envie/receba o Cookie access_token
 });
 
 function App() {
   // ESTADOS
   const [theme, setTheme] = useState('light');
   const [shortcuts, setShortcuts] = useState([]);
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  
+  // Como agora usamos Cookies, o 'user' no localStorage serve apenas para controle de UI (ex: mostrar botão excluir)
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
+  
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
    
-  const [loginData, setLoginData] = useState({ username: '', password: '' });
+  const [loginData, setLoginData] = useState({ name: '', password: '' }); // 'username' alterado para 'name'
   
-  // Dados do atalho (texto)
-  const [shortcutData, setShortcutData] = useState({ id: null, name: '', url: '', image_url: '' });
-  
+  // shortcut_type adicionado conforme seu DTO
+  const [shortcutData, setShortcutData] = useState({ id: null, name: '', link: '', shortcut_type: 'CLIENT_LINK' });
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // EFEITOS (Tema escuro/claro)
   useEffect(() => {
     fetchShortcuts();
   }, []);
@@ -40,7 +43,8 @@ function App() {
   // FUNÇÕES
   const fetchShortcuts = async () => {
     try {
-      const response = await api.get('/shortcut');
+      // Rota pública: /shortcuts
+      const response = await api.get('/shortcuts');
       setShortcuts(response.data || []);
     } catch (error) {
       console.error("Erro ao buscar atalhos", error);
@@ -54,10 +58,12 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await api.post('/login', loginData);
-      const jwt = response.data.token;
-      setToken(jwt);
-      localStorage.setItem('token', jwt);
+      // Rota atualizada: /auth/login
+      const response = await api.post('/auth/login', loginData);
+      const userData = response.data.user;
+      
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
       setIsLoginOpen(false);
       alert("Login realizado com sucesso!");
     } catch (error) {
@@ -66,53 +72,45 @@ function App() {
   };
 
   const handleLogout = () => {
-    setToken(null);
-    localStorage.removeItem('token');
+    setUser(null);
+    localStorage.removeItem('user');
+    // Obs: O cookie HttpOnly continuará no navegador até expirar ou você criar uma rota de logout no backend
   };
 
   const handleSaveShortcut = async (e) => {
     e.preventDefault();
     
-    const config = { 
-        headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-        } 
-    };
-
+    // O backend agora recebe multipart/form-data
     const formData = new FormData();
     formData.append('name', shortcutData.name);
-    formData.append('url', shortcutData.url);
+    formData.append('link', shortcutData.link); // Campo alterado de 'url' para 'link'
+    formData.append('shortcut_type', shortcutData.shortcut_type);
     
     if (selectedFile) {
         formData.append('image', selectedFile);
-    } else {
-        if (shortcutData.image_url) {
-            formData.append('image_url', shortcutData.image_url);
-        }
     }
 
     try {
+      // Rotas administrativas agora ficam sob /admin
       if (shortcutData.id) {
-        await api.put(`/shortcut/${shortcutData.id}`, formData, config);
+        await api.put(`/admin/${shortcutData.id}`, formData);
       } else {
-        await api.post('/shortcut', formData, config);
+        await api.post('/admin', formData);
       }
       
       fetchShortcuts();
       closeModal();
     } catch (error) {
       console.error(error);
-      alert("Erro ao salvar. Verifique se está logado.");
+      alert("Erro ao salvar. Verifique se sua sessão ainda é válida.");
     }
   };
 
   const handleDelete = async (id) => {
     if(!confirm("Tem certeza que deseja excluir?")) return;
     try {
-      await api.delete(`/shortcut/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // Rota administrativa: DELETE /admin/:id
+      await api.delete(`/admin/${id}`);
       fetchShortcuts();
     } catch (error) {
       alert("Erro ao deletar.");
@@ -120,42 +118,41 @@ function App() {
   };
 
   const openEdit = (item) => {
-    setShortcutData({ ...item, image_url: item.image_url || '' });
+    // Mapeando do ResponseDTO para o estado do formulário
+    setShortcutData({ 
+        id: item.id, 
+        name: item.name, 
+        link: item.link || '', 
+        shortcut_type: 'CLIENT_LINK' 
+    });
     setSelectedFile(null); 
     setIsEditModalOpen(true);
   };
 
   const openNew = () => {
-    setShortcutData({ id: null, name: '', url: '', image_url: '' });
+    setShortcutData({ id: null, name: '', link: '', shortcut_type: 'CLIENT_LINK' });
     setSelectedFile(null);
     setIsEditModalOpen(true);
   };
 
   const closeModal = () => {
       setIsEditModalOpen(false);
-      setShortcutData({ id: null, name: '', url: '', image_url: '' });
       setSelectedFile(null);
   }
 
-  // Se for link externo (http...), usa direto. 
-  // Se for caminho relativo (/uploads...), adiciona a URL da API antes.
   const getImageUrl = (path) => {
       if (!path) return null;
       if (path.startsWith('http')) return path;
-      return `${API_BASE_URL}${path}`;
+      return `${STATIC_BASE_URL}${path}`; // Concatena com a raiz (ex: http://localhost:8080/uploads/...)
   };
 
-  // URL DO SITE DA EMPRESA
   const COMPANY_SITE_URL = "http://www.intellisys.com.br/BRPT/index.awp"; 
 
-  // RENDERIZAÇÃO
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300 font-sans">
       
       {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-center p-6 bg-white dark:bg-gray-800 shadow-md gap-4">
-        
-        {/* LOGO HEADER */}
         <div className="text-4xl select-none" style={{ fontFamily: 'Ubuntu, sans-serif' }}>
           <span className="text-black dark:text-white">Intelli</span>
           <span className="text-red-600">sys</span>
@@ -166,8 +163,7 @@ function App() {
             href={COMPANY_SITE_URL}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 transition font-medium"
-            title="Ir para o site da empresa"
+            className="flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-red-600 transition font-medium"
           >
             <Globe size={20} />
             <span className="hidden sm:inline">Site IntelliSys</span>
@@ -179,8 +175,9 @@ function App() {
             {theme === 'light' ? <Moon className="text-gray-700" /> : <Sun className="text-yellow-400" />}
           </button>
 
-          {token ? (
-             <div className="flex items-center gap-2">
+          {user ? (
+             <div className="flex items-center gap-4">
+               <span className="text-sm font-medium dark:text-gray-300">Olá {user.name}</span>
                <button onClick={handleLogout} className="text-sm text-red-500 font-semibold hover:underline">Sair</button>
              </div>
           ) : (
@@ -194,8 +191,8 @@ function App() {
       {/* CONTEÚDO PRINCIPAL */}
       <main className="p-8 max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Nossos Clientes</h2>
-          {token && (
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Soluções Intellisys</h2>
+          {user && (
             <button onClick={openNew} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow transition">
               <Plus size={18} /> Novo Atalho
             </button>
@@ -203,59 +200,68 @@ function App() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {shortcuts.map((shortcut) => (
-            <div 
-              key={shortcut.id} 
-              onClick={() => window.open(shortcut.url, '_blank')}
-              className="cursor-pointer relative bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-1 border-l-4 border-red-600 group flex flex-col h-full"
-            >
-              
-              {/* ÁREA DA LOGO */}
-              <div className="h-24 w-full mb-4 flex items-center justify-center">
-                {shortcut.image_url ? (
-                  <img 
-                    src={getImageUrl(shortcut.image_url)} 
-                    alt={`Logo ${shortcut.name}`} 
-                    className="h-full w-full object-contain" 
-                  />
-                ) : (
-                  <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                    <span className="text-3xl font-bold text-gray-500 dark:text-gray-300 select-none">
-                      {shortcut.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-              </div>
+  {shortcuts.map((shortcut) => (
+    <div 
+      key={shortcut.id} 
+      // O clique em qualquer lugar do quadrado dispara o link
+      onClick={() => shortcut.link && window.open(shortcut.link, '_blank')}
+      className="cursor-pointer relative bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-l-4 border-red-600 group flex flex-col h-full"
+    >
+      
+      {/* ÁREA DA LOGO */}
+      <div className="h-24 w-full mb-4 flex items-center justify-center">
+        {shortcut.image_url && shortcut.image_url.trim() !== "" ? (
+          <img 
+            src={getImageUrl(shortcut.image_url)} 
+            alt={shortcut.name} 
+            className="h-full w-full object-contain" 
+          />
+        ) : (
+          <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 border-2 border-red-100 dark:border-red-800/50 rounded-full flex items-center justify-center shadow-inner">
+            <span className="text-3xl font-black text-red-600 dark:text-red-500 select-none">
+              {shortcut.name ? shortcut.name.charAt(0).toUpperCase() : '?'}
+            </span>
+          </div>
+        )}
+      </div>
 
-              <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{shortcut.name}</h3>
-              
-              {/* Tranforma o Link em um span visual, já que o card todo é o link agora */}
-              <span className="text-blue-500 hover:text-blue-400 text-sm flex items-center gap-1 mb-4 truncate">
-                <ExternalLink size={14}/> Acessar Sistema
-              </span>
+      <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{shortcut.name}</h3>
+      
+      <span className="text-blue-500 hover:text-blue-400 text-sm flex items-center gap-1 mb-4">
+        <ExternalLink size={14}/> Acessar Sistema
+      </span>
 
-              <div className="mt-auto"></div>
+      {/* Espaçador para empurrar os botões para o final */}
+      <div className="mt-auto"></div>
 
-              {token && (
-                <div className="flex justify-end gap-2 mt-4 border-t pt-2 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {/* 3. Adicionado e.stopPropagation() para não abrir o site ao clicar nos botões */}
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); openEdit(shortcut); }} 
-                    className="p-1 text-gray-500 hover:text-blue-500"
-                  >
-                    <Edit size={18} />
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handleDelete(shortcut.id); }} 
-                    className="p-1 text-gray-500 hover:text-red-500"
-                  >
-                    <Trash size={18} />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+      {/* ÁREA DE BOTÕES ADMIN */}
+      {user && (
+        <div className="flex justify-end gap-3 mt-4 border-t pt-3 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <button 
+            title="Editar atalho"
+            onClick={(e) => { 
+              e.stopPropagation(); // IMPEDE que o link abra ao clicar aqui
+              openEdit(shortcut); 
+            }} 
+            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+          >
+            <Edit size={18} />
+          </button>
+          <button 
+            title="Excluir atalho"
+            onClick={(e) => { 
+              e.stopPropagation(); // IMPEDE que o link abra ao clicar aqui
+              handleDelete(shortcut.id); 
+            }} 
+            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+          >
+            <Trash size={18} />
+          </button>
         </div>
+      )}
+    </div>
+  ))}
+</div>
       </main>
 
       {/* MODAL LOGIN */}
@@ -271,8 +277,9 @@ function App() {
                 type="text" 
                 placeholder="Usuário" 
                 className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                value={loginData.username}
-                onChange={e => setLoginData({...loginData, username: e.target.value})}
+                value={loginData.name}
+                onChange={e => setLoginData({...loginData, name: e.target.value})}
+                required
               />
               <input 
                 type="password" 
@@ -280,6 +287,7 @@ function App() {
                 className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
                 value={loginData.password}
                 onChange={e => setLoginData({...loginData, password: e.target.value})}
+                required
               />
               <button type="submit" className="w-full bg-red-600 text-white py-2 rounded hover:bg-red-700">Entrar</button>
             </form>
@@ -309,38 +317,31 @@ function App() {
                 />
               </div>
               
-              {/* MUDANÇA: Input de Upload de Imagem */}
               <div>
                 <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Logo (Imagem)</label>
-                
-                {/* Visualização do nome do arquivo atual ou selecionado */}
                 <div className="flex items-center gap-2 mb-2">
-                    <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded text-sm transition">
+                    <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 rounded text-sm transition">
                         <Upload size={16} /> Escolher Arquivo
                         <input 
                             type="file" 
                             accept="image/*"
                             className="hidden"
-                            onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                    setSelectedFile(e.target.files[0]);
-                                }
-                            }}
+                            onChange={(e) => { if (e.target.files[0]) setSelectedFile(e.target.files[0]); }}
                         />
                     </label>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[150px]">
-                        {selectedFile ? selectedFile.name : (shortcutData.image_url ? 'Imagem atual mantida' : 'Nenhum arquivo')}
+                    <span className="text-xs text-gray-500 truncate max-w-[150px]">
+                        {selectedFile ? selectedFile.name : 'Nenhum arquivo'}
                     </span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400">URL do Sistema</label>
+                <label className="block text-sm text-gray-600 dark:text-gray-400">Link do Sistema</label>
                 <input 
                   type="text" 
                   className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  value={shortcutData.url}
-                  onChange={e => setShortcutData({...shortcutData, url: e.target.value})}
+                  value={shortcutData.link}
+                  onChange={e => setShortcutData({...shortcutData, link: e.target.value})}
                   required
                 />
               </div>
