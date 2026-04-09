@@ -2,8 +2,17 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Settings, Moon, Sun, Plus, Trash, Edit, X, ExternalLink, Globe, Upload } from 'lucide-react';
 
+/*
+// TESTE
 const API_BASE_URL = 'http://localhost:8080/api/v1';
 const STATIC_BASE_URL = 'http://localhost:8080';
+// TESTE
+*/
+
+// PRODUÇÃO
+const API_BASE_URL = '/api/v1';
+const STATIC_BASE_URL = '';
+// PRODUÇÃO
 
 const api = axios.create({
   baseURL: API_BASE_URL,
