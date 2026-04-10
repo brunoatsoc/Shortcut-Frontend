@@ -2,17 +2,18 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Settings, Moon, Sun, Plus, Trash, Edit, X, ExternalLink, Globe, Upload } from 'lucide-react';
 
-/*
+
 // TESTE
 const API_BASE_URL = 'http://localhost:8080/api/v1';
 const STATIC_BASE_URL = 'http://localhost:8080';
 // TESTE
-*/
 
+/*
 // PRODUÇÃO
 const API_BASE_URL = '/api/v1';
 const STATIC_BASE_URL = '';
 // PRODUÇÃO
+*/
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -137,37 +138,45 @@ function App() {
   };
 
   // COMPONENTE DO CARD (Reutilizável)
+  // COMPONENTE DO CARD (Versão Compacta)
   const ShortcutCard = ({ shortcut }) => (
     <div 
       onClick={() => shortcut.link && window.open(shortcut.link, '_blank')}
-      className="cursor-pointer relative bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-l-4 border-red-600 group flex flex-col h-full"
+      // Alterado: p-6 -> p-4 (reduz o respiro interno)
+      className="cursor-pointer relative bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-l-4 border-red-600 group flex flex-col h-full"
     >
-      <div className="h-24 w-full mb-4 flex items-center justify-center">
+      {/* ÁREA DA LOGO - Alterado: h-24 -> h-16 e mb-4 -> mb-2 */}
+      <div className="h-16 w-full mb-2 flex items-center justify-center">
         {shortcut.image_url && shortcut.image_url.trim() !== "" ? (
           <img src={getImageUrl(shortcut.image_url)} alt={shortcut.name} className="h-full w-full object-contain" />
         ) : (
-          <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 border-2 border-red-100 dark:border-red-800/50 rounded-full flex items-center justify-center shadow-inner">
-            <span className="text-3xl font-black text-red-600 dark:text-red-500 select-none">
+          // Reduzi o tamanho do círculo da inicial também para combinar
+          <div className="w-12 h-12 bg-red-50 dark:bg-red-900/20 border-2 border-red-100 dark:border-red-800/50 rounded-full flex items-center justify-center shadow-inner">
+            <span className="text-2xl font-black text-red-600 dark:text-red-500 select-none">
               {shortcut.name ? shortcut.name.charAt(0).toUpperCase() : '?'}
             </span>
           </div>
         )}
       </div>
 
-      <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{shortcut.name}</h3>
-      <span className="text-blue-500 hover:text-blue-400 text-sm flex items-center gap-1 mb-4 truncate">
-        <ExternalLink size={14}/> Acessar Sistema
+      {/* Título - mb-2 -> mb-1 */}
+      <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-1 truncate">{shortcut.name}</h3>
+      
+      {/* Link - mb-4 -> mb-2 */}
+      <span className="text-blue-500 hover:text-blue-400 text-xs flex items-center gap-1 mb-2 truncate">
+        <ExternalLink size={12}/> Acessar Sistema
       </span>
 
       <div className="mt-auto"></div>
 
       {user && (
-        <div className="flex justify-end gap-3 mt-4 border-t pt-3 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <button onClick={(e) => { e.stopPropagation(); openEdit(shortcut); }} className="p-2 text-gray-400 hover:text-blue-500 transition-colors">
-            <Edit size={18} />
+        // Reduzi o mt-4 -> mt-2 e pt-3 -> pt-2
+        <div className="flex justify-end gap-2 mt-2 border-t pt-2 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <button onClick={(e) => { e.stopPropagation(); openEdit(shortcut); }} className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors">
+            <Edit size={16} />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); handleDelete(shortcut.id); }} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
-            <Trash size={18} />
+          <button onClick={(e) => { e.stopPropagation(); handleDelete(shortcut.id); }} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+            <Trash size={16} />
           </button>
         </div>
       )}
